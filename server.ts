@@ -423,9 +423,8 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   /* SecurityQuestions: Only GET list of questions allowed. */
   app.post('/api/SecurityQuestions', security.denyAll())
   app.use('/api/SecurityQuestions/:id', security.denyAll())
-  /* SecurityAnswers: Only POST of answer allowed. */
-  app.get('/api/SecurityAnswers', security.denyAll())
-  app.use('/api/SecurityAnswers/:id', security.denyAll())
+  /* SecurityAnswers: Answers are only created along with a new user via POST /api/Users. */
+  app.use('/api/SecurityAnswers', security.denyAll())
   /* REST API */
   app.use('/rest/user/authentication-details', security.isAuthorized())
   app.use('/rest/basket/:id', security.isAuthorized())
@@ -555,6 +554,20 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
       }) // vuln-code-snippet neutral-line registerAdminChallenge
     } // vuln-code-snippet neutral-line registerAdminChallenge
     // vuln-code-snippet end registerAdminChallenge
+
+    // store the security answer of a newly registered user
+    if (name === 'User') {
+      resource.create.send.before(async (req: Request, res: Response, context: { instance: { id: any }, continue: any }) => {
+        const SecurityQuestionId = req.body.securityQuestion?.id
+        const answer = req.body.securityAnswer
+        if (SecurityQuestionId !== undefined && typeof answer === 'string' && answer !== '') {
+          await SecurityAnswerModel.create({ UserId: context.instance.id, SecurityQuestionId, answer }).catch((err: unknown) => {
+            console.log(err)
+          })
+        }
+        return context.continue
+      })
+    }
 
     // translate challenge descriptions on-the-fly
     if (name === 'Challenge') {
